@@ -1,13 +1,11 @@
 from flask import Flask, jsonify, request
-import requests
-import json
-import os
+import os, requests, json
 
 app = Flask(__name__)
 
 API_KEY = os.environ.get('API_KEY')
 BASE_URL = 'https://marketplace.api.healthcare.gov/api/v1'
-
+    
 @app.route('/plans', methods=['POST'])
 def list_plans():
     args = request.get_json()
@@ -23,8 +21,7 @@ def list_plans():
             return jsonify({"error": "Error fetching fips"}), 400
         args['place']['countyfips'] = fips
 
-    data = json.dumps(args)
-    response = requests.post(f"{BASE_URL}/plans/search?apikey={API_KEY}", data=data, headers={'Content-Type': 'application/json'})
+    response = requests.post(f"{BASE_URL}/plans/search?apikey={API_KEY}", json=args, headers={'Content-Type': 'application/json'})
     output = ''
 
     if response.status_code == 200:
@@ -41,6 +38,7 @@ def list_plans():
                     for cost_sharing in benefit_item['cost_sharings']:
                         cost.append({
                             'copay_amount': cost_sharing['copay_amount'],
+                            'coinsurance_rate': cost_sharing['coinsurance_rate'],
                             'network_tier': cost_sharing['network_tier'],
                         })
                     copay.append(cost)
@@ -54,6 +52,7 @@ def list_plans():
                     'csr': deductible_item['csr'],
                     'family': deductible_item['family'],
                     'individual': deductible_item['individual'],
+                    'family_cost': deductible_item['family_cost'],
                 })
                 
             tiered_deductibles = []
@@ -65,6 +64,31 @@ def list_plans():
                     'csr': tier_deductible_item['csr'],
                     'family': tier_deductible_item['family'],
                     'individual': tier_deductible_item['individual'],
+                    'family_cost': tier_deductible_item['family_cost'],
+                })
+
+            moops = []
+            for moops_item in plan['moops']:
+                moops.append({
+                    'type': moops_item['type'],
+                    'amount': moops_item['amount'],
+                    'network_tier': moops_item['network_tier'],
+                    'csr': moops_item['csr'],
+                    'family': moops_item['family'],
+                    'individual': moops_item['individual'],
+                    'family_cost': moops_item['family_cost'],
+                })
+                
+            tiered_moops = []
+            for tier_moops_item in plan['tiered_moops']:
+                tiered_moops.append({
+                    'type': tier_moops_item['type'],
+                    'amount': tier_moops_item['amount'],
+                    'network_tier': tier_moops_item['network_tier'],
+                    'csr': tier_moops_item['csr'],
+                    'family': tier_moops_item['family'],
+                    'individual': tier_moops_item['individual'],
+                    'family_cost': tier_moops_item['family_cost'],
                 })
 
             issuer = plan.get('issuer', '')
@@ -81,9 +105,11 @@ def list_plans():
                     "toll_free": issuer.get('toll_free', ''),
                     "tty": issuer.get('tty', ''),
                 },
-                "copay_specialist_visit": copay,
+                "sharings_specialist_visit": copay,
                 "deductibles": deductibles,
                 "tiered_deductibles": tiered_deductibles,
+                "moops": moops,
+                "tiered_moops": tiered_moops,
                 "benefits_url": plan.get('benefits_url', ''),
                 "brochure_url": plan.get('brochure_url', ''),
                 "formulary_url": plan.get('formulary_url', ''),
@@ -99,7 +125,7 @@ def list_plans():
         return jsonify(output)
     else:
         return response.json()
-
+    
 @app.route('/plan')
 def get_plan():
     args = request.args
@@ -130,7 +156,7 @@ def get_issuers():
 
     response = requests.get(f"{BASE_URL}/issuers?{params}")
     return response.json()
-    
+
 def get_fips(zipcode):
     response = requests.get(f"{BASE_URL}/counties/by/zip/{zipcode}?apikey={API_KEY}")
     if response.status_code == 200:
@@ -140,7 +166,7 @@ def get_fips(zipcode):
             return None
     else:
         return None
-    
+
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0')

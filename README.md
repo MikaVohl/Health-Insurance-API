@@ -23,6 +23,7 @@ This API is an extension of the CMS Marketplace API which aims to simplify the c
   {
     "place": {
       "zipcode": "string",  // Required
+      "state": "string",  // Required
       "countyfips": "string"  // Optional, will be fetched if not provided
     },
     "market": "string"  // Required
